@@ -14,4 +14,5 @@ Timeline & Plan for execution:
 
 Time usage: 
 
-19.2.2026 initial setup for project and documentation - 1h 
+19.2.2026 initial setup for project and documentation - 30min 
+19.2.2026 Trying to figureout renderloop for three.js and pixi.js 
