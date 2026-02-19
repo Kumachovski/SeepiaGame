@@ -12,7 +12,6 @@ Timeline & Plan for execution:
 
  Documentation of the process and project on the side as well as writing downtime used for each step. 
 
-Time usage: 
-
-19.2.2026 initial setup for project and documentation - 30min 
-19.2.2026 Trying to figureout renderloop for three.js and pixi.js 
+Time usage: <br>
+19.2.2026 initial setup for project and documentation - 30min <br>
+19.2.2026 Trying to figureout renderloop for three.js and pixi.js <br>
