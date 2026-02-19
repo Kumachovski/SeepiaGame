@@ -1,0 +1,27 @@
+{
+  "name": "seepiagame",
+  "version": "1.0.0",
+  "description": "game for seepia.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Kumachovski/SeepiaGame.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Kumachovski/SeepiaGame/issues"
+  },
+  "homepage": "https://github.com/Kumachovski/SeepiaGame#readme",
+  "dependencies": {
+    "pixi.js": "^8.16.0",
+    "three.js": "^0.77.1"
+  },
+  "devDependencies": {
+    "vite": "^7.3.1"
+  }
+}
