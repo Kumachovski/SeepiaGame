@@ -17,3 +17,4 @@ Time usage: <br>
 19.2.2026 Trying to figureout renderloop for three.js and pixi.js - 2.5h <br>
 20.2.2026 Fixing issue with Three.js (old package version) -1h <br>
 20.2.2026 making player character move on the screen - 3h <br>
+23.2.2026 adding ground fixing movement, realizing theres build-ion controls... - 2h <br>

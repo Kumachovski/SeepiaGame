@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { Vector3 } from 'three.js';
 import { Object3D } from 'three.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { mod } from 'three/tsl';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 // Self-executing async function to set up the demo
 (async () => {
@@ -16,6 +16,9 @@ const globals = {
   time: 0,
   deltaTime: 0,
 };
+
+const SLATEWIDTH = 2;
+const SLATEHEIGHT = SLATEWIDTH;
 
 //Scene setup
 const scene = new THREE.Scene();
@@ -32,7 +35,7 @@ document.body.appendChild(threeRenderer.domElement);
 
 //Camera setup
 const camera = new THREE.PerspectiveCamera(70, WIDTH / HEIGHT);
-camera.position.set(50, -20, -20);
+camera.position.set(-10, 10, 10);
 camera.lookAt(0, 0, 0);
 scene.add(camera);
 
@@ -43,41 +46,63 @@ const light = new THREE.DirectionalLight(color, intensity);
 light.position.set(10, 10, 20);
 scene.add(light);
 
+const controls = new OrbitControls( camera, threeRenderer.domElement );
+
 // Load 3D player model
 const textureloader = new THREE.TextureLoader();
 const plrtexture = textureloader.load('assets/ninja.png');
 plrtexture.colorSpace = THREE.SRGBColorSpace;
 
-const plrmaterial = new THREE.MeshPhongMaterial({ 
-  map: plrtexture,  
-});
-
 const objloader = new GLTFLoader();
 
-
-  objloader.load('assets/cibus_ninja.glb', (glb) => {
-  const model = glb.scene;    
-  model.traverse((node) => {
-        if (node.isMesh) {            
-            node.material.map = plrtexture;
-            node.material.needsUpdate = true;
-        }
-    }); 
-  model.name = 'player';   
-  model.scale.set(10 , 10, 10);
-  // model.translateX(direction.x * 5); // Move model left or right based on direction
-  // model.translateY(direction.y * 5); // Move model forward or backward based on direction
-  //model.rotation.y = 4.5; // Rotate model to face the camera
-  scene.add(model); 
+objloader.load('assets/cibus_ninja.glb', (glb) => {
+const model = glb.scene;    
+model.traverse((node) => {
+      if (node.isMesh) {            
+          node.material.map = plrtexture;
+          node.material.needsUpdate = true;
+      }
+  }); 
+model.name = 'player';   
+model.scale.set(1, 1, 1);
+scene.add(model); 
 }); 
 
+// Create a simple ground plane slates
+const planeGeometry = new THREE.PlaneGeometry(SLATEHEIGHT, SLATEWIDTH);
+const planeMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+plane.rotation.x = -Math.PI / 2; // Rotate to make it horizontal
+const planeGeometry2 = new THREE.PlaneGeometry(SLATEHEIGHT, SLATEWIDTH);
+const planeMaterial2 = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+const plane2 = new THREE.Mesh(planeGeometry2, planeMaterial2);
+plane2.rotation.x = -Math.PI / 2; // Rotate to make it horizontal
+const amountOfSlates = 10;
 
-
-const cylinderGeometry = new THREE.CylinderGeometry(3, 3, 10);
-const basicMaterial = new THREE.MeshPhongMaterial({ color: 0x0095dd });
-const player = new THREE.Mesh(cylinderGeometry, basicMaterial);
-//scene.add(player);
-
+//propagate ground with slates
+for (let i = -amountOfSlates; i < amountOfSlates; i++) {
+  for (let j = -amountOfSlates; j < amountOfSlates; j++) {
+    const slate = plane.clone();
+    const slate2 = plane2.clone();
+    if (i % 2 === 0) {      
+      if (j % 2 === 0) {
+      slate.position.set(i * SLATEWIDTH, 0, j * SLATEWIDTH); 
+      scene.add(slate);
+      } else {
+      slate2.position.set(i * SLATEWIDTH, 0, j * SLATEWIDTH);
+      scene.add(slate2);
+      }          
+    } else {
+      if (j % 2 !== 0) {
+      slate.position.set(i * SLATEWIDTH, 0, j * SLATEWIDTH);
+      scene.add(slate);
+      } else {
+      slate2.position.set(i * SLATEWIDTH, 0, j * SLATEWIDTH); 
+      scene.add(slate2);
+      }
+    } 
+  }
+}
 // Cast the context to satisfy TypeScript
 const context = threeRenderer.getContext() as WebGL2RenderingContext;
 
@@ -93,9 +118,9 @@ await pixiRenderer.init({
 
 const stage = new PIXI.Container();
 // Create a simple UI element in PixiJS
-const amazingUI = new PIXI.Graphics().roundRect(20, 80, 100, 100, 5).roundRect(220, 80, 100, 100, 5).fill(0xffff00);
+const amazingUI = new PIXI.Graphics().roundRect(20, 80, 100, 30, 5).roundRect(140, 80, 100, 30, 5).fill(0xffff00);
 // Create a simple BG in PixiJS
-const bg = new PIXI.Graphics().fill(0x0000ff).rect(0, 0, WIDTH, HEIGHT);
+const bg = new PIXI.Graphics().rect(0, 0, WIDTH, HEIGHT).fill(0x0000ff, 0.5);
 
 stage.addChild(bg);
 stage.addChild(amazingUI);
@@ -109,45 +134,40 @@ function render(now: number) {
   // make sure delta time isn't too big.
   globals.deltaTime = Math.min(globals.time - then, 1 / 20);
   then = globals.time;
-  const plr = scene.getObjectByName('player') as Object3D;
-  //  if (plr) {
-  //   plr.rotation.y += 0.01; // Rotate player continuously
-  // }  
+  const plr = scene.getObjectByName('player') as Object3D;  
 
   window.addEventListener('keydown', (e) => {  
     if (e.code === 'KeyW') {
-      console.log('W key pressed');
-      console.log(scene.getObjectByName('player') as Object3D); 
-      plr.translateZ(-.1); // Move model forward or backward based on direction
+      console.log('W key pressed');      
+      plr.translateZ(.001); // Move model forward or backward based on direction
       turnCamera(plr.position); // Rotate camera to face the player
+      console.log(plr.position); 
       return;
     }
     if (e.code === 'KeyA') {
-      console.log('A key pressed');
-      console.log(scene.getObjectByName('player') as Object3D);      
-      plr.translateX(-.1); // Move model left or right based on direction
+      console.log('A key pressed');          
+      //plr.translateX(-.001); // Move model left or right based on direction
+      plr.rotateY(0.001); // Rotate model left or right based on direction
       turnCamera(plr.position); // Rotate camera to face the player
+      console.log(plr.position);
       return;
     }
     if (e.code === 'KeyS') {
-      console.log('S key pressed');
-      console.log(scene.getObjectByName('player') as Object3D);     
-      plr.translateZ(.1); // Move model forward or backward based on direction
+      console.log('S key pressed');          
+      plr.translateZ(-.001); // Move model forward or backward based on direction
       turnCamera(plr.position); // Rotate camera to face the player
+      console.log(plr.position);
       return;
     }
     if (e.code === 'KeyD') {
-      console.log('D key pressed');
-      console.log(scene.getObjectByName('player') as Object3D);       
-      plr.translateX(.1); // Move model left or right based on direction
+      console.log('D key pressed');             
+      //plr.translateX(.001); // Move model left or right based on direction
+      plr.rotateY(-0.001); // Rotate model left or right based on direction
       turnCamera(plr.position); // Rotate camera to face the player
+      console.log(plr.position);
       return;
     }
   });
-  // Rotate player continuously
-  // player.rotation.x += 0.01;
-  // player.rotation.y += 0.01;
-  
 
   // Animate UI layer position using sine wave
   //amazingUI.y = ((Math.sin(Date.now() * 0.001) + 1) * 0.5 * WIDTH) / 2;
