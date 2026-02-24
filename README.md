@@ -19,3 +19,4 @@ Time usage: <br>
 20.2.2026 making player character move on the screen - 3h <br>
 23.2.2026 adding ground fixing movement, realizing theres build-ion controls... - 2h <br>
 23.2.2026 studying example code and cleaning code - 2h <br>
+24.2.2026 copying parts of example code and fixing types, Tree.js part of MVP done - 4h <br>

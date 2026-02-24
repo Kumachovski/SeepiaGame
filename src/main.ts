@@ -8,212 +8,584 @@ import { Object3D } from 'three.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
-import { add } from 'three/tsl';
+import { add, mod } from 'three/tsl';
 
 // Self-executing async function to set up the demo
 (async () => {
-const WIDTH = window.innerWidth;
-const HEIGHT = window.innerHeight;
-const globals = {
-  time: 0,
-  deltaTime: 0,
-};
+  const WIDTH = window.innerWidth;
+  const HEIGHT = window.innerHeight;
 
-const SLATEWIDTH = 2;
-const SLATEHEIGHT = SLATEWIDTH;
+  const SLATEWIDTH = 2;
+  const SLATEHEIGHT = SLATEWIDTH;
 
-const camera = new THREE.PerspectiveCamera(70, WIDTH / HEIGHT);
+  // Create a container for PixiJS elements
+  const stage = new PIXI.Container();
+  //Scene setup
+  const scene = new THREE.Scene();
 
-// Create a container for PixiJS elements
-const stage = new PIXI.Container();
-//Scene setup
-const scene = new THREE.Scene();
+  const manager = new THREE.LoadingManager();
+  manager.onLoad = init;
 
-//Three.js renderer setup
-const threeRenderer = new THREE.WebGLRenderer({
-  antialias: true,
-  stencil: true, // so masks work in pixijs
-});
+  // Loading ninja texture/material
+  const textureloader = new THREE.TextureLoader();
+  const plrtexture = textureloader.load('assets/ninja.png');
+  plrtexture.colorSpace = THREE.SRGBColorSpace;
 
-threeRenderer.setSize(WIDTH, HEIGHT);
-threeRenderer.setClearColor(0xdddddd, 1);
-document.body.appendChild(threeRenderer.domElement);
-
-const controls = new OrbitControls( camera, threeRenderer.domElement );
-
-//Camera setup
-function addCamera(x: number, y: number, z: number) {  
-  camera.position.set(x, y, z);
-  camera.lookAt(0, 0, 0);
-  scene.add(camera);
-}
-
-//Light setup
-function addLight(x: number, y: number, z: number) {
-  const color = 0xFFFFFF;
-  const intensity = 3;
-  const light = new THREE.DirectionalLight(color, intensity);
-  light.position.set(x, y, z);
-  scene.add(light);
-}
-
-// Load 3D player texture and model
-const textureloader = new THREE.TextureLoader();
-const plrtexture = textureloader.load('assets/ninja.png');
-plrtexture.colorSpace = THREE.SRGBColorSpace;
-
-const gltfLoader = new GLTFLoader();
-gltfLoader.load('assets/cibus_ninja.glb', (glb) => {
-const model = glb.scene; 
-model.traverse((node) => {
-      if (node.isMesh) {            
-          node.material.map = plrtexture;
-          node.material.needsUpdate = true;
-      }
-  }); 
-model.name = 'player';   
-model.scale.set(1, 1, 1);
-scene.add(model); 
-}); 
-
-function prepModelsAndAnimations() {
-  
-    const animsByName = {};
-    model.gltf.animations.forEach((clip) => {
-      animsByName[clip.name] = clip;
-    });
-    model.animations = animsByName;
- 
-}
-
-
-// Cast the context to satisfy TypeScript
-const context = threeRenderer.getContext() as WebGL2RenderingContext;
-
-//Pixi.js renderer setup
-const pixiRenderer = new PIXI.WebGLRenderer();
-await pixiRenderer.init({
-  context: context,
-  width: WIDTH,
-  height: HEIGHT,
-  clearBeforeRender: false, // Prevent PixiJS from clearing the Three.js render
-});
-
-
-function init() {
-  //add camera 
-  addCamera(-10, 10, -10);
-  //add lights
-  addLight(10, 20, 10);   
-      
-  // Pixi objects setup 
-  const amazingUI = new PIXI.Graphics().roundRect(20, 80, 100, 30, 5).roundRect(140, 80, 100, 30, 5).fill(0xffff00);
-  const bg = new PIXI.Graphics().rect(0, 0, WIDTH, HEIGHT).fill({color: 0x0000ff, alpha: 0.2});
-  stage.addChild(bg);
-  stage.addChild(amazingUI);
-
-  //Three objects setup
-  // Create a simple ground plane slates
-  const planeGeometry = new THREE.PlaneGeometry(SLATEHEIGHT, SLATEWIDTH);
-  const planeMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
-  const plane = new THREE.Mesh(planeGeometry, planeMaterial);
-  plane.rotation.x = -Math.PI / 2; // Rotate to make it horizontal
-  const planeGeometry2 = new THREE.PlaneGeometry(SLATEHEIGHT, SLATEWIDTH);
-  const planeMaterial2 = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
-  const plane2 = new THREE.Mesh(planeGeometry2, planeMaterial2);
-  plane2.rotation.x = -Math.PI / 2; // Rotate to make it horizontal
-  const amountOfSlates = 10;
-
-  //propagate ground with slates
-  for (let i = -amountOfSlates; i < amountOfSlates; i++) {
-    for (let j = -amountOfSlates; j < amountOfSlates; j++) {
-      const slate = plane.clone();
-      const slate2 = plane2.clone();
-      if (i % 2 === 0) {      
-        if (j % 2 === 0) {
-        slate.position.set(i * SLATEWIDTH, 0, j * SLATEWIDTH); 
-        scene.add(slate);
-        } else {
-        slate2.position.set(i * SLATEWIDTH, 0, j * SLATEWIDTH);
-        scene.add(slate2);
-        }          
-      } else {
-        if (j % 2 !== 0) {
-        slate.position.set(i * SLATEWIDTH, 0, j * SLATEWIDTH);
-        scene.add(slate);
-        } else {
-        slate2.position.set(i * SLATEWIDTH, 0, j * SLATEWIDTH); 
-        scene.add(slate2);
-        }
-      } 
+  const models: any = {
+    ninja: THREE.Group<THREE.Object3DEventMap>,
+  };
+  {
+    const gltfLoader = new GLTFLoader( manager );
+    for ( const model of Object.values( models ) ) {
+      if ( model === models.ninja ) {
+        gltfLoader.load( 'assets/cibus_ninja.glb', ( glb ) => {
+        const model = glb.scene;
+        model.animations = glb.animations;
+        model.scale.set( 1, 1, 1 );
+        model.name = 'ninja';
+        models.ninja = model;
+        } );
+      }    
     }
   }
 
-}
+  const camera = new THREE.PerspectiveCamera(70, WIDTH / HEIGHT);
 
-init();
 
-let then = 0;
-function render(now: number) {
 
-  // convert to seconds
-  globals.time = now * 0.001;
-  // make sure delta time isn't too big.
-  globals.deltaTime = Math.min(globals.time - then, 1 / 20);
-  then = globals.time;
-  const plr = scene.getObjectByName('player') as THREE.Object3D;  
-
-  window.addEventListener('keydown', (e) => {  
-    if (e.code === 'KeyW') {
-      console.log('W key pressed');      
-      plr.translateZ(.001); // Move model forward or backward based on direction
-      turnCamera(plr.position); // Rotate camera to face the player
-      console.log(plr.position); 
-      return;
-    }
-    if (e.code === 'KeyA') {
-      console.log('A key pressed');          
-      //plr.translateX(-.001); // Move model left or right based on direction
-      plr.rotateY(0.001); // Rotate model left or right based on direction
-      turnCamera(plr.position); // Rotate camera to face the player
-      console.log(plr.position);
-      return;
-    }
-    if (e.code === 'KeyS') {
-      console.log('S key pressed');          
-      plr.translateZ(-.001); // Move model forward or backward based on direction
-      turnCamera(plr.position); // Rotate camera to face the player
-      console.log(plr.position);
-      return;
-    }
-    if (e.code === 'KeyD') {
-      console.log('D key pressed');             
-      //plr.translateX(.001); // Move model left or right based on direction
-      plr.rotateY(-0.001); // Rotate model left or right based on direction
-      turnCamera(plr.position); // Rotate camera to face the player
-      console.log(plr.position);
-      return;
-    }
+  //Three.js renderer setup
+  const threeRenderer = new THREE.WebGLRenderer({
+    antialias: true,
+    stencil: true, // so masks work in pixijs
   });
 
-  // Animate UI layer position using sine wave
-  //amazingUI.y = ((Math.sin(Date.now() * 0.001) + 1) * 0.5 * WIDTH) / 2;
+  threeRenderer.setSize(WIDTH, HEIGHT);
+  threeRenderer.setClearColor(0xdddddd, 1);
+  document.body.appendChild(threeRenderer.domElement);
 
-  // Render the Three.js scene
-  threeRenderer.resetState();
-  threeRenderer.render(scene, camera);
+  const controls = new OrbitControls( camera, threeRenderer.domElement );
 
-  // Render the PixiJS stage
-  pixiRenderer.resetState();
-  pixiRenderer.render({ container: stage });
+  //Camera setup
+  function addCamera(x: number, y: number, z: number) {  
+    camera.position.set(x, y, z);
+    camera.lookAt(0, 0, 0);
+    scene.add(camera);
+  }
+
+  //Light setup
+  function addLight(x: number, y: number, z: number) {
+    const color = 0xFFFFFF;
+    const intensity = 3;
+    const light = new THREE.DirectionalLight(color, intensity);
+    light.position.set(x, y, z);
+    scene.add(light);
+  }
+
+  // Load 3D player texture and model
+  // const gltfLoader = new GLTFLoader();
+  // gltfLoader.load('assets/cibus_ninja.glb', (glb) => {
+  // const model = glb.scene; 
+  // model.traverse((node) => {
+  //       if (node.isMesh) {            
+  //           node.material.map = plrtexture;
+  //           node.material.needsUpdate = true;
+  //       }
+  //   }); 
+  // model.animations = glb.animations;
+  // model.name = 'player';   
+  // model.scale.set(1, 1, 1);
+  // scene.add(model); 
+  // }); 
+
+
+  // Cast the context to satisfy TypeScript
+  const context = threeRenderer.getContext() as WebGL2RenderingContext;
+
+  //Pixi.js renderer setup
+  const pixiRenderer = new PIXI.WebGLRenderer();
+  await pixiRenderer.init({
+    context: context,
+    width: WIDTH,
+    height: HEIGHT,
+    clearBeforeRender: false, // Prevent PixiJS from clearing the Three.js render
+  });
+
+  // Keeps the state of keys/buttons
+    //
+    // You can check
+    //
+    //   inputManager.keys.left.down
+    //
+    // to see if the left key is currently held down
+    // and you can check
+    //
+    //   inputManager.keys.left.justPressed
+    //
+    // To see if the left key was pressed this frame
+    //
+    // Keys are 'left', 'right', 'a', 'b', 'up', 'down'
+    class InputManager {
+      keys: {[key: string]: { down: boolean; justPressed: boolean }};
+
+      constructor() {
+
+        this.keys = {};
+        const keyMap = new Map();
+
+        const setKey = ( keyName: string, pressed: boolean ) => {
+
+          const keyState = this.keys[ keyName ];
+          keyState.justPressed = pressed && ! keyState.down;
+          keyState.down = pressed;
+
+        };
+
+        const addKey = ( keyCode: string, name: string ) => {
+
+          this.keys[ name ] = { down: false, justPressed: false };
+          keyMap.set( keyCode, name );
+
+        };
+
+        const setKeyFromKeyCode = ( keyCode: string, pressed: boolean ) => {
+
+          const keyName = keyMap.get( keyCode );
+          if ( ! keyName ) {
+
+            return;
+
+          }
+
+          setKey( keyName, pressed );
+
+        };
+
+        addKey( 'ArrowLeft', 'left' );
+        addKey( 'ArrowRight', 'right' );
+        addKey( 'ArrowUp', 'up' );
+        addKey( 'ArrowDown', 'down' );
+        // addKey( 'KeyA', 'a' );
+        // addKey( 'KeyB', 'b' );
+
+        window.addEventListener( 'keydown', ( e ) => {
+
+          setKeyFromKeyCode( e.code, true );
+
+        } );
+        window.addEventListener( 'keyup', ( e ) => {
+
+          setKeyFromKeyCode( e.code, false );
+
+        } );
+
+        const sides = [
+          { elem: document.querySelector( '#left' ), key: 'left' },
+          { elem: document.querySelector( '#right' ), key: 'right' },
+        ];
+
+        // note: not a good design?
+        // The last direction the user presses should take
+        // precedence. Example: User presses L, without letting go of
+        // L user presses R. Input should now be R. User lets off R
+        // Input should now be L.
+        // With this code if user pressed both L and R result is nothing
+
+        
+        // Mouse event handling
+        // const clearKeys = () => {
+        // 	for ( const { key } of sides ) {
+        //		setKey( key, false );
+        // 	}
+        // };
+        // const handleMouseMove = ( e:PointerEvent ) => {
+
+        // 	e.preventDefault();
+        // 	// this is needed because we call preventDefault();
+        // 	// we also gave the canvas a tabindex so it can
+        // 	// become the focus
+        // 	canvas.focus();
+        // 	window.addEventListener( 'pointermove', handleMouseMove );
+        // 	window.addEventListener( 'pointerup', handleMouseUp );
+
+        // 	for ( const { elem, key } of sides ) {
+
+        // 		let pressed = false;
+        // 		const rect = elem.getBoundingClientRect();
+        // 		const x = e.clientX;
+        // 		const y = e.clientY;
+        // 		const inRect = x >= rect.left && x < rect.right &&
+        //                    y >= rect.top && y < rect.bottom;
+        // 		if ( inRect ) {
+
+        // 			pressed = true;
+
+        // 		}
+
+        // 		setKey( key, pressed );
+
+        // 	}
+
+        // };
+
+        // function handleMouseUp() {
+
+        // 	clearKeys();
+        // 	window.removeEventListener( 'pointermove', handleMouseMove, { passive: false } );
+        // 	window.removeEventListener( 'pointerup', handleMouseUp );
+
+        // }
+
+        // const uiElem = document.querySelector( '#ui' );
+        // uiElem.addEventListener( 'pointerdown', handleMouseMove, { passive: false } );
+
+        // uiElem.addEventListener( 'touchstart', ( e ) => {
+
+        // 	// prevent scrolling
+        // 	e.preventDefault();
+
+        // }, { passive: false } );
+
+      }
+      update() {
+
+        for ( const keyState of Object.values( this.keys ) ) {
+
+          if ( keyState.justPressed ) {
+
+            keyState.justPressed = false;
+
+          }
+
+        }
+
+      }
+
+    }
+
+  function removeArrayElement( array: any[], element: number ) {
+      const ndx = array.indexOf( element );
+      if ( ndx >= 0 ) {
+        array.splice( ndx, 1 );
+      }
+    }
+
+  class SafeArray {
+      array: any[];
+      addQueue: any[];
+      removeQueue: Set<any>;
+
+      constructor() {
+        this.array = [];
+        this.addQueue = [];
+        this.removeQueue = new Set();
+      }
+
+      get isEmpty() {
+        return this.addQueue.length + this.array.length > 0;
+      }
+
+      add( element: any ) {
+        this.addQueue.push( element );
+      }
+
+      remove( element: any ) {
+        this.removeQueue.add( element );
+      }
+
+      forEach( fn: ( element: any ) => void ) {
+        this._addQueued();
+        this._removeQueued();
+        for ( const element of this.array ) {
+          if ( this.removeQueue.has( element ) ) {
+            continue;
+          }
+
+          fn( element );
+        }
+
+        this._removeQueued();
+      }
+
+      _addQueued() {
+        if ( this.addQueue.length ) {
+          this.array.splice( this.array.length, 0, ...this.addQueue );
+          this.addQueue = [];
+        }
+      }
+
+      _removeQueued() {
+        if ( this.removeQueue.size ) {
+          this.array = this.array.filter( element => ! this.removeQueue.has( element ) );
+          this.removeQueue.clear();
+        }
+      }
+    }
+
+  class GameObjectManager {
+    gameObjects: SafeArray; 
+
+    constructor() {
+
+      this.gameObjects = new SafeArray();
+
+    }
+
+    createGameObject( parent: any, name: string ) {
+      const gameObject = new GameObject( parent, name );
+      this.gameObjects.add( gameObject );
+      return gameObject;
+    }
+
+    removeGameObject( gameObject: any ) {
+      this.gameObjects.remove( gameObject );
+    }
+
+    update() {
+      this.gameObjects.forEach( gameObject => gameObject.update() );
+    }
+  }
+
+  const forward = new Vector3( 0, 0, 1 );
+  const globals = {
+    time: 0,
+    deltaTime: 0,
+    moveSpeed: 16,
+    camera,
+    playerPosition: new THREE.Vector3(),
+    playerState: 'idle',
+    cameraInfo: {
+      frustum: new THREE.Frustum(),
+      projScreenMatrix: new THREE.Matrix4(),
+    },
+  };
+
+  const gameObjectManager = new GameObjectManager();
+  const inputManager = new InputManager();
+
+  class GameObject {
+    name: string;
+    components: any[];
+    transform: THREE.Object3D;
+
+      constructor( parent: any, name: string ) {
+        this.name = name;
+        this.components = [];
+        this.transform = new THREE.Object3D();
+        parent.add( this.transform );
+      }
+
+      addComponent( ComponentType: any, ...args: any[] ) {
+        const component = new ComponentType( this, ...args );
+        this.components.push( component );
+        return component;
+      }
+
+      removeComponent( component: any ) {
+        removeArrayElement( this.components, component );
+      }
+
+      getComponent( ComponentType: any ) {
+        return this.components.find( c => c instanceof ComponentType );
+      }
+
+      update() {
+        for ( const component of this.components ) {
+          component.update();
+        }
+      }
+    }
+    
+  // Base for all components
+  class Component {
+    gameObject: any;
+    constructor( gameObject: any ) {
+
+      this.gameObject = gameObject;
+
+    }
+    update() {
+    }
+
+  }
+
+  class SkinInstance extends Component {
+    model: THREE.Group<THREE.Object3DEventMap>;
+    animRoot: THREE.Object3D<THREE.Object3DEventMap>;
+    mixer: THREE.AnimationMixer;
+    actions: Array<THREE.AnimationAction>;
+
+    constructor( gameObject: any, model: THREE.Group<THREE.Object3DEventMap>) {
+      super( gameObject );
+      this.model = model;
+      this.animRoot = SkeletonUtils.clone( this.model );
+      this.mixer = new THREE.AnimationMixer( this.animRoot );
+      gameObject.transform.add( this.animRoot );
+      this.actions = [];
+    }
+
+    setAnimation( animNbr: number ) {
+      const clip = this.model.animations[ animNbr ];
+      // turn off all current actions
+      for ( const action of Object.values( this.actions ) ) {
+        action.enabled = false;
+      }
+
+      // get or create existing action for clip
+      const action = this.mixer.clipAction( clip );
+      action.enabled = true;
+      action.reset();
+      action.play();
+      this.actions[ animNbr ] = action;
+    }
+
+    update() {
+      this.mixer.update( globals.deltaTime );
+    }
+  }
+
+  class Player extends Component {
+    skinInstance: SkinInstance;
+    turnSpeed: number;
+    offscreenTimer: number;
+    maxTimeOffScreen: number;
+    plrStateNow: string;
+
+    constructor( gameObject: GameObject ) {
+      super( gameObject );
+      const model = models.ninja;
+      this.skinInstance = gameObject.addComponent( SkinInstance, model );
+      this.skinInstance.setAnimation( 4 ); // 0- front flip, 1- weapon flip  ,2- weapon crossing(defend?) ,3- getting hit , 4- idle
+      this.turnSpeed = globals.moveSpeed / 4;
+      this.offscreenTimer = 0;
+      this.maxTimeOffScreen = 3;
+      this.plrStateNow = 'idle';
+    }
+
+    update() {      
+      const { deltaTime, moveSpeed } = globals;
+      const { transform } = this.gameObject;
+      const delta = ( inputManager.keys.left.down ? 1 : 0 ) +
+                    ( inputManager.keys.right.down ? - 1 : 0 );
+      transform.rotation.y += this.turnSpeed * delta * deltaTime;
+
+      // Move player while up key is pressed and set player global state to running, otherwise set it to idle
+      if ( inputManager.keys.up.down ) {              
+        transform.translateOnAxis( forward, moveSpeed * deltaTime );
+        globals.playerState = 'running';        
+      } else {
+        globals.playerState = 'idle';
+      }
+      
+      // Change player animation based on player state, if state changed since last frame
+      if ( this.plrStateNow !== globals.playerState ) {                      
+        this.skinInstance.setAnimation( globals.playerState === 'running' ? 0 : 4 )       
+        this.plrStateNow = globals.playerState;
+      }
+
+      // Keep track of player position in globals and 
+      globals.playerPosition = transform.position.clone();
+      
+      // If player is outside of camera frustum for too long, reset player position to (0, 0, 0)
+      // const { frustum } = globals.cameraInfo;
+      // if ( frustum.containsPoint( transform.position ) ) {
+      //   this.offscreenTimer = 0;
+      // } else {
+      //   this.offscreenTimer += deltaTime;
+      //   if ( this.offscreenTimer >= this.maxTimeOffScreen ) {
+      //     transform.position.set( 0, 0, 0 );
+      //   }
+      // }
+    }
+  }
+
+
+
+  function init() {
+    //add camera 
+    addCamera(-10, 10, -10);
+    //add lights
+    addLight(10, 20, 10);   
+        
+    // Pixi objects setup 
+    const amazingUI = new PIXI.Graphics().roundRect(20, 80, 100, 30, 5).roundRect(140, 80, 100, 30, 5).fill(0xffff00);
+    const bg = new PIXI.Graphics().rect(0, 0, WIDTH, HEIGHT).fill({color: 0x0000ff, alpha: 0.2});
+    stage.addChild(bg);
+    stage.addChild(amazingUI);
+
+    //Three objects setup
+    {
+			const gameObject = gameObjectManager.createGameObject( scene, 'player' );
+			gameObject.addComponent( Player );    
+		}
+    
+    // Create a simple ground plane slates
+    const planeGeometry = new THREE.PlaneGeometry(SLATEHEIGHT, SLATEWIDTH);
+    const planeMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+    const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+    plane.rotation.x = -Math.PI / 2; // Rotate to make it horizontal
+    const planeGeometry2 = new THREE.PlaneGeometry(SLATEHEIGHT, SLATEWIDTH);
+    const planeMaterial2 = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+    const plane2 = new THREE.Mesh(planeGeometry2, planeMaterial2);
+    plane2.rotation.x = -Math.PI / 2; // Rotate to make it horizontal  
+    
+    //propagate ground with slates
+    const amountOfSlates = 10;
+    for (let i = -amountOfSlates; i < amountOfSlates; i++) {
+      for (let j = -amountOfSlates; j < amountOfSlates; j++) {
+        const slate = plane.clone();
+        const slate2 = plane2.clone();
+        if (i % 2 === 0) {      
+          if (j % 2 === 0) {
+          slate.position.set(i * SLATEWIDTH, 0, j * SLATEWIDTH); 
+          scene.add(slate);
+          } else {
+          slate2.position.set(i * SLATEWIDTH, 0, j * SLATEWIDTH);
+          scene.add(slate2);
+          }          
+        } else {
+          if (j % 2 !== 0) {
+          slate.position.set(i * SLATEWIDTH, 0, j * SLATEWIDTH);
+          scene.add(slate);
+          } else {
+          slate2.position.set(i * SLATEWIDTH, 0, j * SLATEWIDTH); 
+          scene.add(slate2);
+          }
+        } 
+      }
+    }
+
+  }
+
+  let then = 0;
+  function render(now: number) {
+
+    // convert to seconds
+    globals.time = now * 0.001;
+    // make sure delta time isn't too big.
+    globals.deltaTime = Math.min(globals.time - then, 1 / 20);
+    then = globals.time;
+    
+    gameObjectManager.update();
+		inputManager.update();
+    // Animate UI layer position using sine wave
+    //amazingUI.y = ((Math.sin(Date.now() * 0.001) + 1) * 0.5 * WIDTH) / 2;
+    turnCamera(globals.playerPosition);
+
+    // Render the Three.js scene
+    threeRenderer.resetState();
+    threeRenderer.render(scene, camera);
+
+    // Render the PixiJS stage
+    pixiRenderer.resetState();
+    pixiRenderer.render({ container: stage });
+
+    requestAnimationFrame(render);
+  }
+
+  function turnCamera(direction: THREE.Vector3) {
+    camera.lookAt(direction);
+  }
 
   requestAnimationFrame(render);
-}
-
-function turnCamera(direction: Vector3) {
-  camera.lookAt(direction);
-}
-
-requestAnimationFrame(render);
 
 })();
