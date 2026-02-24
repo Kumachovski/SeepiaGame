@@ -24,7 +24,7 @@ import { add, mod } from 'three/tsl';
   const scene = new THREE.Scene();
 
   const manager = new THREE.LoadingManager();
-  manager.onLoad = init;
+  
 
   // Loading ninja texture/material
   const textureloader = new THREE.TextureLoader();
@@ -41,6 +41,13 @@ import { add, mod } from 'three/tsl';
         gltfLoader.load( 'assets/cibus_ninja.glb', ( glb ) => {
         const model = glb.scene;
         model.animations = glb.animations;
+        model.traverse( ( node ) => {
+          node.visible = true;
+          if ( node.isMesh ) {
+            node.material.side = THREE.DoubleSide;
+            node.material.map = plrtexture;
+            node.material.needsUpdate = true;
+          }});
         model.scale.set( 1, 1, 1 );
         model.name = 'ninja';
         models.ninja = model;
@@ -50,8 +57,6 @@ import { add, mod } from 'three/tsl';
   }
 
   const camera = new THREE.PerspectiveCamera(70, WIDTH / HEIGHT);
-
-
 
   //Three.js renderer setup
   const threeRenderer = new THREE.WebGLRenderer({
@@ -498,7 +503,7 @@ import { add, mod } from 'three/tsl';
     }
   }
 
-
+  manager.onLoad = init;
 
   function init() {
     //add camera 
