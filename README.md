@@ -20,3 +20,4 @@ Time usage: <br>
 23.2.2026 adding ground fixing movement, realizing theres build-ion controls... - 2h <br>
 23.2.2026 studying example code and cleaning code - 2h <br>
 24.2.2026 copying parts of example code and fixing types, Tree.js part of MVP done - 4h <br>
+25.2.2026 added settings window, timer and restart button, cleaned up code a bit - 6h <br>
