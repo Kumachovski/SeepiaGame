@@ -99,19 +99,6 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
   });
 
   // Keeps the state of keys/buttons
-  //
-  // You can check
-  //
-  //   inputManager.keys.left.down
-  //
-  // to see if the left key is currently held down
-  // and you can check
-  //
-  //   inputManager.keys.left.justPressed
-  //
-  // To see if the left key was pressed this frame
-  //
-  // Keys are 'left', 'right', 'a', 'b', 'up', 'down'
   class InputManager {
     keys: {[key: string]: { down: boolean; justPressed: boolean }};
 
@@ -330,6 +317,10 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
     update() {
       this.gameObjects.forEach( gameObject => gameObject.update() );
+      if(globals.stateReset){
+        globals.stateReset = false;
+      }
+      
     }
   }
 
@@ -493,19 +484,37 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
       
       //If game resets
       if (globals.stateReset){
-        transform.position.set(-10, 2, -10);
-        globals.stateReset = false;
-      }
-      // If player is outside of camera frustum for too long, reset player position to (0, 0, 0)
-      // const { frustum } = globals.cameraInfo;
-      // if ( frustum.containsPoint( transform.position ) ) {
-      //   this.offscreenTimer = 0;
-      // } else {
-      //   this.offscreenTimer += deltaTime;
-      //   if ( this.offscreenTimer >= this.maxTimeOffScreen ) {
-      //     transform.position.set( 0, 0, 0 );
-      //   }
-      // }
+        transform.position.set(-10, 2, -10);        
+      }      
+    }
+  }
+
+  class Enemy extends Component {
+    skinInstance: SkinInstance;   
+
+    constructor( gameObject: GameObject ) {
+      super( gameObject );
+      const model = models.ninja;
+      this.skinInstance = gameObject.addComponent( SkinInstance, model );                        
+      gameObject.transform.position.set(-5, 2, -5);
+      gameObject.transform.rotateY(Math.PI/2);
+    }
+
+    update() {      
+      const { deltaTime, moveSpeed } = globals;
+      const { transform } = this.gameObject;      
+      const dirx = globals.playerPosition.x - transform.position.x;
+      const dirz = globals.playerPosition.z - transform.position.z;
+      const angleToPlayer = -Math.atan2(dirz, dirx) + Math.PI/2;
+      transform.rotation.y = angleToPlayer;      
+      
+      // Move enemy forward all the time
+      transform.translateOnAxis( forward, moveSpeed * deltaTime * Number(globals.timer.text) * 0.01 );              
+      
+      //If game resets
+      if (globals.stateReset){
+        transform.position.set(-5, 2, -5);        
+      }      
     }
   }
 
@@ -519,29 +528,17 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
     addLight(10, 20, 10);                
 
     // Pixi objects setup 
-    //const settingsBtn = new PIXI.Graphics().roundRect(20, 20, 100, 100, 5).fill(0xffff00);
-    const settingsBtn = new PIXI.Sprite(settingsTexture);
-    settingsBtn.label = 'settingsBtn';
-    settingsBtn.width = 100;
-    settingsBtn.height = 100;
-    settingsBtn.position.set(20);
-    settingsBtn.hitArea = new PIXI.Rectangle(20,20,100,100);
-    settingsBtn.eventMode = 'static';
-    settingsBtn.cursor = 'pointer';
-    settingsBtn
-      .on('pointerover', (e) => onButtonOver(settingsBtn))
-      .on('pointerout', (e) => onButtonOut(settingsBtn));
-    window.addEventListener('pointerdown', (e) => onButtonDown(settingsBtn))
-    window.addEventListener('pointerup', (e) => onButtonUp(settingsBtn))
-    window.addEventListener('pointerupoutside', (e) => onButtonUp(settingsBtn))
-
-    stage.addChild(settingsBtn);      
+    addSettingsButton();
     stage.addChild(globals.timer);
 
     //Three objects setup
     {
 			const gameObject = gameObjectManager.createGameObject( scene, 'player' );
 			gameObject.addComponent( Player );    
+		}
+    {
+			const gameObject = gameObjectManager.createGameObject( scene, 'enemy' );
+			gameObject.addComponent( Enemy );    
 		}
     
     // Create a simple ground boxes
@@ -609,6 +606,25 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
     pixiRenderer.render({ container: stage });
 
     requestAnimationFrame(render);
+  }
+
+  function addSettingsButton(){
+    const settingsBtn = new PIXI.Sprite(settingsTexture);
+    settingsBtn.label = 'settingsBtn';
+    settingsBtn.width = 100;
+    settingsBtn.height = 100;
+    settingsBtn.position.set(20);
+    settingsBtn.hitArea = new PIXI.Rectangle(20,20,100,100);
+    settingsBtn.eventMode = 'static';
+    settingsBtn.cursor = 'pointer';
+    settingsBtn
+      .on('pointerover', (e) => onButtonOver(settingsBtn))
+      .on('pointerout', (e) => onButtonOut(settingsBtn));
+    window.addEventListener('pointerdown', (e) => onButtonDown(settingsBtn))
+    window.addEventListener('pointerup', (e) => onButtonUp(settingsBtn))
+    window.addEventListener('pointerupoutside', (e) => onButtonUp(settingsBtn))
+
+    stage.addChild(settingsBtn);      
   }
 
   function turnCamera(direction: THREE.Vector3) {
