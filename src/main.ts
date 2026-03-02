@@ -352,7 +352,8 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
       x: WIDTH - 400,
       y: 30    
     }),
-    stateReset: false
+    stateReset: false,
+    gamePaused: false,
   };
 
   const gameObjectManager = new GameObjectManager();
@@ -362,11 +363,12 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
     name: string;
     components: any[];
     transform: THREE.Object3D;
-
+    mesh: THREE.Mesh | null;
       constructor( parent: any, name: string ) {
         this.name = name;
         this.components = [];
         this.transform = new THREE.Object3D();
+        this.mesh = null;
         parent.add( this.transform );
       }
 
@@ -465,9 +467,16 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
                     ( inputManager.keys.right.down ? - 1 : 0 );
       transform.rotation.y += this.turnSpeed * delta * deltaTime;
 
-      // Move player while up key is pressed and set player global state to running, otherwise set it to idle
+      // Move player while up or down arrow key is pressed and set player global state to running, otherwise set it to idle
       if ( inputManager.keys.up.down ) {              
         transform.translateOnAxis( forward, moveSpeed * deltaTime );
+        globals.playerState = 'running';        
+      } else {
+        globals.playerState = 'idle';
+      }
+      const backwards = new THREE.Vector3( 0, 0, -1 );
+      if ( inputManager.keys.down.down ) {              
+        transform.translateOnAxis( backwards, moveSpeed * deltaTime );
         globals.playerState = 'running';        
       } else {
         globals.playerState = 'idle';
@@ -518,6 +527,42 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
     }
   }
 
+  class GroundBlock extends Component {    
+    moveup = true;
+    constructor( gameObject: GameObject, color: THREE.ColorRepresentation, position: THREE.Vector3 ) {
+      super( gameObject );
+      const model = new THREE.BoxGeometry(BOXHEIGHT, BOXWIDTH, BOXDEPTH);
+      const material = new THREE.MeshStandardMaterial({ color: color });
+      gameObject.mesh = new THREE.Mesh(model, material);      
+      gameObject.transform.position.set(position.x, position.y, position.z);
+      gameObject.transform.add(gameObject.mesh);      
+    }
+
+    update() {      
+      const { deltaTime, moveSpeed } = globals;
+      const { transform } = this.gameObject;            
+      console.log(transform.position.y);
+      // Move Block up and down if it's a red block, if it's a green block it stays still
+      if (this.gameObject.mesh?.material.color.getHex() === 0xff0000){
+        if(!this.moveup){
+          transform.translateOnAxis( new THREE.Vector3(0, -1, 0), deltaTime);
+          if(transform.position.y <= 0){
+            this.moveup = true;
+          }        
+        } if(this.moveup){
+          transform.translateOnAxis( new THREE.Vector3(0, 1, 0), deltaTime);
+          if(transform.position.y >= 2){
+            this.moveup = false;
+          }        
+        }
+        //If game resets
+        if (globals.stateReset){
+          transform.position.copy(this.gameObject.transform.position);
+        }      
+      }
+    }
+  }
+
   
   manager.onLoad = init;
 
@@ -540,6 +585,14 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 			const gameObject = gameObjectManager.createGameObject( scene, 'enemy' );
 			gameObject.addComponent( Enemy );    
 		}
+    // {
+		// 	const gameObject = gameObjectManager.createGameObject( scene, 'redBox' );
+		// 	gameObject.addComponent( GroundBlock, 0xff0000, new THREE.Vector3(10, 0, 10) );    
+		// }
+    // {
+		// 	const gameObject = gameObjectManager.createGameObject( scene, 'greenBox' );
+		// 	gameObject.addComponent( GroundBlock, 0x00ff00, new THREE.Vector3(10, 0, 10) );    
+		// }
     
     // Create a simple ground boxes
     const boxGeometry = new THREE.BoxGeometry(BOXHEIGHT, BOXWIDTH, BOXDEPTH);
@@ -547,34 +600,66 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
     const box1 = new THREE.Mesh(boxGeometry, boxMaterial);      
     const boxMaterial2 = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
     const box2 = new THREE.Mesh(boxGeometry, boxMaterial2);
-    
-    
+        
     //propagate ground with slates
-    const amountOfBoxes = 10;
+    const amountOfBoxes = 2;
+    
     for (let i = -amountOfBoxes; i < amountOfBoxes; i++) {
       for (let j = -amountOfBoxes; j < amountOfBoxes; j++) {
         const slate1 = box1.clone();
         const slate2 = box2.clone();
         if (i % 2 === 0) {      
           if (j % 2 === 0) {
-          slate1.position.set(i * BOXWIDTH, 0, j * BOXWIDTH); 
-          scene.add(slate1);
+            {
+              const gameObject = gameObjectManager.createGameObject( scene, 'redBox'+i+j );
+              gameObject.addComponent( GroundBlock, 0xff0000, new THREE.Vector3(i * BOXWIDTH, 0, j * BOXWIDTH ) );    
+            }
           } else {
-          slate2.position.set(i * BOXWIDTH, 0, j * BOXWIDTH);
-          scene.add(slate2);
+            {
+              const gameObject = gameObjectManager.createGameObject( scene, 'greenBox'+i+j );
+              gameObject.addComponent( GroundBlock, 0x00ff00, new THREE.Vector3(i * BOXWIDTH, 0, j * BOXWIDTH ) );    
+            }
           }          
         } else {
           if (j % 2 !== 0) {
-          slate1.position.set(i * BOXWIDTH, 0, j * BOXWIDTH);
-          scene.add(slate1);
+            {
+              const gameObject = gameObjectManager.createGameObject( scene, 'redBox'+i+j );
+              gameObject.addComponent( GroundBlock, 0xff0000, new THREE.Vector3(i * BOXWIDTH, 0, j * BOXWIDTH ) );    
+            }
           } else {
-          slate2.position.set(i * BOXWIDTH, 0, j * BOXWIDTH); 
-          scene.add(slate2);
+            {
+              const gameObject = gameObjectManager.createGameObject( scene, 'greenBox'+i+j );
+              gameObject.addComponent( GroundBlock, 0x00ff00, new THREE.Vector3(i * BOXWIDTH, 0, j * BOXWIDTH ) );    
+            }
           }
         } 
       }
     }
+    console.log(scene.children);
   }
+  // for (let i = -amountOfBoxes; i < amountOfBoxes; i++) {
+  //     for (let j = -amountOfBoxes; j < amountOfBoxes; j++) {
+  //       const slate1 = box1.clone();
+  //       const slate2 = box2.clone();
+  //       if (i % 2 === 0) {      
+  //         if (j % 2 === 0) {
+  //         slate1.position.set(i * BOXWIDTH, 0, j * BOXWIDTH); 
+  //         scene.add(slate1);
+  //         } else {
+  //         slate2.position.set(i * BOXWIDTH, 0, j * BOXWIDTH);
+  //         scene.add(slate2);
+  //         }          
+  //       } else {
+  //         if (j % 2 !== 0) {
+  //         slate1.position.set(i * BOXWIDTH, 0, j * BOXWIDTH);
+  //         scene.add(slate1);
+  //         } else {
+  //         slate2.position.set(i * BOXWIDTH, 0, j * BOXWIDTH); 
+  //         scene.add(slate2);
+  //         }
+  //       } 
+  //     }
+  //   }
 
   var sNow = 0;
   var sThen = 0;
@@ -587,15 +672,17 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
     globals.deltaTime = Math.min(globals.time - then, 1 / 20);
     then = globals.time;
     
-    gameObjectManager.update();
-		inputManager.update();
-    
-    turnCamera(globals.playerPosition);   
     sNow = Math.round(globals.time)
-    if (sNow !== sThen){
-      globals.timer.text = Number(globals.timer.text) + 1;
-      sThen = sNow;
+    if (!globals.gamePaused) {
+      gameObjectManager.update();
+		  inputManager.update();
+      if (sNow !== sThen){
+        globals.timer.text = Number(globals.timer.text) + 1;
+        sThen = sNow;
+      }
     }
+
+    turnCamera(globals.playerPosition);           
 
     // Render the Three.js scene
     threeRenderer.resetState();
@@ -697,7 +784,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
   function onSettingsClicked(){
     globals.settingsOpen = true;
     //Pause game
-
+    globals.gamePaused = true;
     //Popup settings window
     const settingsPopUpSprite = new PIXI.Sprite(PIXI.Texture.WHITE);
     const startBtn = new PIXI.Sprite(startBtnTexture);
@@ -741,7 +828,8 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
       }
       i--;      
     });   
-    } while (i > 0 );     
+    } while (i > 0 );
+    globals.gamePaused = false;     
   }
 
   requestAnimationFrame(render);

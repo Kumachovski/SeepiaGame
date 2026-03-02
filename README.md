@@ -13,7 +13,7 @@ Timeline & Plan for execution:
  Documentation of the process and project on the side as well as writing downtime used for each step. 
 
 Time usage: <br>
-19.2.2026 initial setup for project and documentation - 30min <br>
+19.2.2026 initial setup for project and documentation - 0.5 <br>
 19.2.2026 Trying to figureout renderloop for three.js and pixi.js - 2.5h <br>
 20.2.2026 Fixing issue with Three.js (old package version) -1h <br>
 20.2.2026 making player character move on the screen - 3h <br>
@@ -22,3 +22,4 @@ Time usage: <br>
 24.2.2026 copying parts of example code and fixing types, Tree.js part of MVP done - 4h <br>
 25.2.2026 added settings window, timer and restart button, cleaned up code a bit - 6h <br>
 1.3.2026  added enemy that follows player and gets more speed as time passes - 2h <br>
+2.3.2026  added pause, backwards movement, ground blocks and movement for red blocks - 1.5h <br>
