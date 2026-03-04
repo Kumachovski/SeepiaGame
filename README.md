@@ -24,3 +24,4 @@ Time usage: <br>
 1.3.2026  added enemy that follows player and gets more speed as time passes - 2h <br>
 2.3.2026  added pause, backwards movement, ground blocks and movement for red blocks - 1.5h <br>
 3.3.2026  added logic for ground block movement, cleaned code and broke animation on forward movement xD - 2h <br>
+4.3.2026  changed ground logic, added colliders and made "gamelogic". Game over if you get caught by enemy, animation issue fixed, code cleaned - 5.5h <br>

@@ -363,8 +363,11 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
     offscreenTimer: number;
     maxTimeOffScreen: number;
     plrStateNow: string;
-    plrPos = new THREE.Vector3(5, 2, 5);
+    plrPos = new THREE.Vector3(5, 1, 5);
     name: string;
+    boundingBox: THREE.Box3;
+    baseBoundingBox: THREE.Box3;
+    freeze: boolean;
     constructor( gameObject: GameObject ) {
       super( gameObject );
       const model = models.ninja;
@@ -376,40 +379,65 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
       this.plrStateNow = 'idle';
       gameObject.transform.position.copy(this.plrPos);
       this.name = gameObject.name;
+      this.baseBoundingBox = new THREE.Box3(new THREE.Vector3(-0.5,1.1,-0.5),new THREE.Vector3(0.5,2.1,0.5));
+      this.boundingBox = new THREE.Box3(new THREE.Vector3(),new THREE.Vector3());
+      this.freeze = false;      
     }
 
     update() {      
       const { deltaTime, moveSpeed } = globals;
       const { transform } = this.gameObject;
       const delta = ( inputManager.keys.left.down ? 1 : 0 ) +
-                    ( inputManager.keys.right.down ? - 1 : 0 );
-      transform.rotation.y += this.turnSpeed * delta * deltaTime;
-
+                    ( inputManager.keys.right.down ? - 1 : 0 );      
+      transform.rotation.y += this.turnSpeed * delta * deltaTime;      
+      //Move bounding box with model geometry
+      this.boundingBox.copy(this.baseBoundingBox).applyMatrix4(transform.matrixWorld);
       // Move player while up or down arrow key is pressed and set player global state to running, otherwise set it to idle
-      if ( inputManager.keys.up.down ) {              
-        transform.translateOnAxis( forward, moveSpeed * deltaTime );
-        this.plrStateNow = 'running';
-        console.log(globals.playerState);
-        console.log(this.plrStateNow);        
-      } else {
-        this.plrStateNow = 'idle';
+      if (!this.freeze){
+        if ( inputManager.keys.up.down ) {
+          transform.translateOnAxis( forward, moveSpeed * deltaTime );
+          this.plrStateNow = 'running';        
+        } else {
+          this.plrStateNow = 'idle';
+        }
+        
+        if ( inputManager.keys.down.down ) {
+          transform.translateOnAxis( backwards, moveSpeed * deltaTime );
+          this.plrStateNow = 'running';
+        } else if (!inputManager.keys.up.down && !inputManager.keys.down.down) {
+          this.plrStateNow = 'idle';
+        }
       }
-      
-      if ( inputManager.keys.down.down ) {              
-        transform.translateOnAxis( backwards, moveSpeed * deltaTime );
-        this.plrStateNow = 'running';
-      } else {
-        this.plrStateNow = 'idle';
-      }
-      
-      console.log(globals.playerState);
-      console.log(this.plrStateNow);
+     
       // Change player animation based on player state, if state changed since last frame
       if ( this.plrStateNow !== globals.playerState ) {                      
         this.skinInstance.setAnimation( this.plrStateNow === 'running' ? 0 : 4 )       
         globals.playerState = this.plrStateNow;
       }
 
+      var freezingBlock = "";
+      // Check if player is colliding with any object and proceed accordingly
+      gameObjectManager.gameObjects.forEach((gameObject: any) => {        
+          
+        if (gameObject.name.includes('redBox')){          
+          if (this.boundingBox.intersectsBox(gameObject.components[0].hitBoundingBox)){
+            this.freeze= true;
+            freezingBlock = gameObject.name;
+          } 
+        }
+        if (gameObject.name.includes('enemy')){          
+          if (this.boundingBox.intersectsBox(gameObject.components[1].boundingBox)){ 
+            console.log('Player is colliding with ' + gameObject.name);            
+            gameOver();           
+          }
+        } 
+        if (gameObject.name.includes(freezingBlock)){
+          if (gameObject.transform.position.y <= 0){
+            this.freeze = false;
+          }
+        }     
+      });
+                  
       // Keep track of player position in globals and 
       globals.playerPosition = transform.position.clone();
       
@@ -422,13 +450,19 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
   class Enemy extends Component {
     skinInstance: SkinInstance;   
-    enemyPos = new THREE.Vector3(10, 2, 10);
+    enemyPos = new THREE.Vector3(10, 1, 10);
+    boundingBox: THREE.Box3;
+    baseBoundingBox: THREE.Box3;
+    freeze: boolean;
     constructor( gameObject: GameObject ) {
       super( gameObject );
       const model = models.ninja;
       this.skinInstance = gameObject.addComponent( SkinInstance, model );                        
       gameObject.transform.position.copy(this.enemyPos);
       gameObject.transform.rotateY(Math.PI/2);
+      this.baseBoundingBox = new THREE.Box3(new THREE.Vector3(-0.5,1.1,-0.5),new THREE.Vector3(0.5,2.1,0.5));
+      this.boundingBox = new THREE.Box3(new THREE.Vector3(),new THREE.Vector3());
+      this.freeze = false;
     }
 
     update() {      
@@ -437,11 +471,35 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
       const dirx = globals.playerPosition.x - transform.position.x;
       const dirz = globals.playerPosition.z - transform.position.z;
       const angleToPlayer = -Math.atan2(dirz, dirx) + Math.PI/2;
+      
+      //Move bounding box with model geometry
+      this.boundingBox.copy(this.baseBoundingBox).applyMatrix4(transform.matrixWorld);
+      
       transform.rotation.y = angleToPlayer;      
       
-      // Move enemy forward all the time
-      transform.translateOnAxis( forward, moveSpeed * deltaTime * Number(globals.timer.text) * 0.01 );              
+      // Move enemy forward all the time when not freezed
+      if (!this.freeze) {
+        transform.translateOnAxis( forward, moveSpeed * deltaTime * Number(globals.timer.text) * 0.01 );              
+      }
       
+      var freezingBlock = "";
+      // Check if enemy is colliding with any object and proceed accordingly
+      gameObjectManager.gameObjects.forEach((gameObject: any) => {        
+          
+        if (gameObject.name.includes('redBox')){          
+          if (this.boundingBox.intersectsBox(gameObject.components[0].hitBoundingBox)){
+            this.freeze= true;
+            freezingBlock = gameObject.name;
+            console.log('Enemy is colliding with ' + gameObject.name);           
+          } 
+        }      
+        if (gameObject.name.includes(freezingBlock)){
+          if (gameObject.transform.position.y <= 0){
+            this.freeze = false;
+          }
+        }     
+      });
+
       //If game resets
       if (globals.stateReset){
         transform.position.copy(this.enemyPos);        
@@ -452,6 +510,8 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
   class GroundBlock extends Component {    
     moveup = true;    
     name: string;
+    hitBoundingBox: THREE.Box3;
+    
     constructor( gameObject: GameObject, color: THREE.ColorRepresentation, position: THREE.Vector3 ) {
       super( gameObject );
       const model = new THREE.BoxGeometry(BOXHEIGHT, BOXWIDTH, BOXDEPTH);
@@ -459,14 +519,18 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
       gameObject.mesh = new THREE.Mesh(model, material);      
       gameObject.transform.position.set(position.x, position.y, position.z);
       gameObject.transform.add(gameObject.mesh);
-      this.name = gameObject.name;         
+      this.name = gameObject.name;
+      this.hitBoundingBox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
+      this.hitBoundingBox.setFromObject(gameObject.mesh);          
     }
 
     update() {      
       const { deltaTime } = globals;
-      const { transform } = this.gameObject;                        
+      const { transform, mesh, moveThisObject } = this.gameObject; 
+      //Move bounding box with box geometry
+      this.hitBoundingBox.copy(mesh.geometry.boundingBox).applyMatrix4(transform.matrixWorld)                       
       // Move Block up and down if it's a red block and if moveThisBlock is true
-      if (this.gameObject.moveThisObject) {
+      if (moveThisObject) {
         if(!this.moveup && transform.position.y >= 0){        
           transform.translateOnAxis( new THREE.Vector3(0, -1, 0), deltaTime);
         
@@ -484,7 +548,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
         //If game resets
         if (globals.stateReset){
           transform.position.y = 0;
-        }      
+        }        
       }
     }
   }
@@ -557,18 +621,22 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
     
     sNow = Math.round(globals.time)
 
-    if (!globals.gamePaused) {
-      
+    if (!globals.gamePaused) {            
+
       gameObjectManager.update();
 		  inputManager.update();
 
       if (sNow !== sThen){
         const rand1 = Math.round(Math.random() * globals.amountOfBoxes);
         const rand2 = Math.round(Math.random() * globals.amountOfBoxes);
+        const rand3 = Math.round(Math.random() * globals.amountOfBoxes);
+        const rand4 = Math.round(Math.random() * globals.amountOfBoxes);
+        const rand5 = Math.round(Math.random() * globals.amountOfBoxes);
+        const rand6 = Math.round(Math.random() * globals.amountOfBoxes);
         globals.timer.text = Number(globals.timer.text) + 1;        
         sThen = sNow;
         gameObjectManager.gameObjects.forEach((gameObject: any) => {
-          if (gameObject.name === 'redBox'+rand1+rand2){
+          if (gameObject.name === 'redBox'+rand1+rand2 || gameObject.name === 'redBox'+rand3+rand4||gameObject.name === 'redBox'+rand5+rand6){
             gameObject.moveThisObject = true;
           }
         });
@@ -586,7 +654,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
     pixiRenderer.render({ container: stage });
 
     requestAnimationFrame(render);
-  }
+  }  
 
   function addSettingsButton(){
     const settingsBtn = new PIXI.Sprite(settingsTexture);
@@ -611,47 +679,47 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
     camera.lookAt(direction);
   }
   
-  function onButtonDown(btn: PIXI.Sprite) { 
-    //console.log('button down');   
+  function onButtonDown(btn: PIXI.Sprite) {       
     if (globals.btnState.isOver === true){
       console.log("button '"+ globals.oBtn +"' is pressed with mouse");
       if(globals.oBtn ==='settingsBtn'){
         onSettingsClicked();
       }
-      if(globals.oBtn ==='startBtn'){
-        console.log('start clicked '+globals.settingsOpen);
+      if(globals.oBtn ==='startBtn'){        
         globals.timer.text = 0; 
         globals.stateReset = true;
-        settingsMenuClosed();
-        console.log(stage.children);
+        settingsMenuClosed();        
         globals.settingsOpen = false;
       }
     } else {
-      if (globals.settingsOpen === true){
-        console.log('menu closed '+globals.settingsOpen);
-        settingsMenuClosed();
-        console.log(stage.children);
+      if (globals.settingsOpen === true){        
+        settingsMenuClosed();        
         globals.settingsOpen = false;
       }
     }
-    globals.btnState.isDown = true;
-    //btn.alpha = 1;
+    globals.btnState.isDown = true;    
   }
 
-  function onButtonUp(btn: PIXI.Sprite) {
-    //console.log('button up');
+  function onButtonUp(btn: PIXI.Sprite) {    
     globals.btnState.isDown = false;
     if (globals.btnState.isOver) {
       if (globals.oBtn === 'settingsBtn'){
-      btn.texture = settingsOnTexture;
-    }
+        btn.texture = settingsOnTexture;
+      }
+      if (globals.oBtn === 'startBtn'){
+        btn.texture = startBtnOnTexture;
+      }
     } else {      
-      btn.texture = settingsTexture;
+      if (globals.oBtn === 'settingsBtn'){
+        btn.texture = settingsTexture;
+      }
+      if (globals.oBtn === 'startBtn'){
+        btn.texture = startBtnTexture;
+      }
     }    
   }
 
-  function onButtonOver(btn: PIXI.Sprite) {
-    console.log('button '+btn.label+' over');
+  function onButtonOver(btn: PIXI.Sprite) {    
     globals.btnState.isOver = true;
     globals.oBtn = btn.label;
     if (globals.btnState.isDown) {
@@ -716,18 +784,37 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
     
     stage.addChild(settingsPopUpSprite);
     stage.addChild(startBtn);
+    globals.oBtn = 'none';
+  }
+
+  function gameOver(){    
+    globals.stateReset = true;
+    onSettingsClicked();
+    var gameOverText = new PIXI.BitmapText({
+      text: "Game Over \n your score is\n"+globals.timer.text,
+      style: {
+        fontFamily: 'Grandstander ExtraBold',
+        fontSize: 70,
+        fill: 0x557755, 
+        align: 'center',           
+      },
+      label: 'gameOverText',        
+    })
+    gameOverText.position.set(WIDTH/2-210 , HEIGHT/2+90)
+    stage.addChild(gameOverText);
   }
 
   function settingsMenuClosed(){
-    var i = 5;
+    var i = 10;
     do {
       stage.children.forEach(child => {
-      if (child.label === 'settingsMenu'||child.label === 'startBtn') {
+      if (child.label === 'settingsMenu'||child.label === 'startBtn'||child.label === 'gameOverText'){
         stage.removeChild(child);
       }
       i--;      
     });   
     } while (i > 0 );
+    globals.oBtn = 'none';
     globals.gamePaused = false;     
   }
 
